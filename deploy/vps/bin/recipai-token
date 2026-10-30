@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# The shared token the app sends in X-RecipAI-Token.
+#   recipai-token          print it (vps.ps1 -AppEnv reads it into mobile/.env)
+#   recipai-token nuevo    replace it; apps built with the old one stop working
+set -euo pipefail
+env_file=/etc/recipai/recipai.env
+case "${1:-}" in
+  "") grep '^RECIPAI_APP_TOKEN=' "$env_file" | cut -d= -f2- ; exit 0 ;;
+  nuevo) token=$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))') ;;
+  *) echo "Uso: recipai-token [nuevo]" >&2; exit 2 ;;
+esac
+sed -i "s/^RECIPAI_APP_TOKEN=.*/RECIPAI_APP_TOKEN=$token/" "$env_file"
+systemctl restart recipai
+echo "Token nuevo guardado. Actualiza la app: .\\vps.ps1 -AppEnv en el PC."

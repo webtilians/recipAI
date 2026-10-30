@@ -1,0 +1,23 @@
+[Unit]
+Description=RecipAI backend (FastAPI + Gemini) - recipes from a photo
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=recipai
+Group=recipai
+WorkingDirectory=/opt/recipai/backend
+EnvironmentFile=/etc/recipai/recipai.env
+ExecStart=/opt/recipai-venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8300 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=3
+# Shares the machine with LAIN, DH Trails and the lab: it mostly waits on Gemini.
+MemoryMax=250M
+CPUWeight=50
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

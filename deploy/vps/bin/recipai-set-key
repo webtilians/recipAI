@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Give RecipAI its Gemini key. The key is never echoed and is stored only in
+# /etc/recipai/recipai.env (root, 600).
+#
+#   recipai-set-key              paste a Google AI Studio key (aistudio.google.com/apikey)
+#   recipai-set-key --from-lain  reuse the Gemini key LAIN already has on this server
+#   recipai-set-key --demo       back to canned demo recipes (the key is deleted)
+set -euo pipefail
+umask 077
+[ "$(id -u)" -eq 0 ] || { echo "Ejecuta como root." >&2; exit 1; }
+env_file=/etc/recipai/recipai.env
+
+# Rewrites one KEY=value line without the value ever reaching a command line.
+set_var() {
+  RECIPAI_VAR="$1" RECIPAI_VALUE="$2" python3 - "$env_file" <<'PY'
+import os, sys
+path, name, value = sys.argv[1], os.environ["RECIPAI_VAR"], os.environ["RECIPAI_VALUE"]
+lines = open(path, encoding="utf-8").read().splitlines()
+found = False
+for i, line in enumerate(lines):
+    if line.startswith(name + "="):
+        lines[i] = f"{name}={value}"
+        found = True
+if not found:
+    lines.append(f"{name}={value}")
+tmp = path + ".new"
+with open(tmp, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")
+os.chmod(tmp, 0o600)
+os.replace(tmp, path)
+PY
+}
+
+case "${1:-}" in
+  --demo)
+    set_var GEMINI_API_KEY ""
+    set_var RECIPAI_DEMO 1
+    systemctl restart recipai
+    echo "RecipAI vuelve al modo demo (recetas de ejemplo)."
+    exit 0
+    ;;
+  --from-lain)
+    lain=/etc/lain/lain.env
+    grep -q '^LAIN_LLM_ENDPOINT=.*googleapis' "$lain" 2>/dev/null \
+      || { echo "LAIN no tiene una clave de Gemini en $lain." >&2; exit 1; }
+    key=$(grep '^LAIN_LLM_API_KEY=' "$lain" | cut -d= -f2-)
+    ;;
+  "")
+    if [ -t 0 ]; then
+      read -rsp "Pega tu clave de Gemini y pulsa Enter (no se verá en pantalla): " key
+      echo
+    else
+      # vps.ps1 asks on the PC (masked) and sends the key through SSH's stdin.
+      read -r key || true
+    fi
+    ;;
+  *) echo "Uso: recipai-set-key [--from-lain|--demo]" >&2; exit 2 ;;
+esac
+
+# Terminals may wrap a paste in ESC[200~...ESC[201~; Windows PowerShell may add a byte order mark.
+key=${key//$'\xef\xbb\xbf'/}
+key=${key//$'\e[200~'/}
+key=${key//$'\e[201~'/}
+key=$(printf '%s' "$key" | tr -d '[:space:][:cntrl:]')
+if ! [[ $key =~ ^[A-Za-z0-9._-]{20,200}$ ]]; then
+  odd=$(printf '%s' "$key" | tr -d 'A-Za-z0-9._-' | wc -c)
+  echo "Eso no parece una clave de Gemini (${#key} caracteres, $odd no válidos). No he cambiado nada." >&2
+  exit 1
+fi
+
+model=$(grep '^GEMINI_MODEL=' "$env_file" | cut -d= -f2-)
+model=${model:-gemini-flash-latest}
+echo "Probando la clave con $model..."
+# The key goes in a header read from stdin, so it never appears in the process list.
+code=$(printf 'x-goog-api-key: %s\n' "$key" | curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H @- \
+  "https://generativelanguage.googleapis.com/v1beta/models/$model")
+if [ "$code" = "404" ]; then
+  echo "Google no conoce el modelo $model. Cambia GEMINI_MODEL en $env_file. No he cambiado nada." >&2
+  exit 1
+elif [ "$code" != "200" ]; then
+  echo "Google rechaza la clave (HTTP $code). No he cambiado nada." >&2
+  exit 1
+fi
+
+set_var GEMINI_API_KEY "$key"
+set_var RECIPAI_DEMO 0
+key=""
+systemctl restart recipai
+for _ in $(seq 1 20); do
+  curl -fsS --max-time 3 http://127.0.0.1:8300/health 2>/dev/null | grep -q '"ai_configured":true' && break
+  sleep 1
+done
+recipai-status

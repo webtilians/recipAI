@@ -1,0 +1,5 @@
+# Server scripts run on Linux: keep LF even when checked out on Windows.
+*.sh text eol=lf
+deploy/vps/bin/* text eol=lf
+deploy/vps/systemd/* text eol=lf
+deploy/vps/*.caddy text eol=lf

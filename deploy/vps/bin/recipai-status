@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# One look at RecipAI: service, version, AI mode and public address. Never prints secrets.
+set -euo pipefail
+host=$(cat /etc/recipai/host 2>/dev/null || echo '?')
+echo "Servicio:  $(systemctl is-active recipai)"
+echo "Rama:      $(cat /etc/recipai/branch 2>/dev/null || echo '?')"
+echo "Versión:   $(git -C /opt/recipai log -1 --format='%h %s' 2>/dev/null || echo '?')"
+echo "Dirección: https://$host"
+health=$(curl -fsS --max-time 5 http://127.0.0.1:8300/health 2>/dev/null || echo '')
+if [ -z "$health" ]; then
+  echo "IA:        sin respuesta (journalctl -u recipai -n 50)"
+elif printf '%s' "$health" | grep -q '"model":"demo"'; then
+  echo "IA:        modo demo (recetas de ejemplo). Activa Gemini con recipai-set-key."
+elif printf '%s' "$health" | grep -q '"ai_configured":true'; then
+  echo "IA:        Gemini ($(printf '%s' "$health" | sed -n 's/.*"model":"\([^"]*\)".*/\1/p'))"
+else
+  echo "IA:        sin configurar. Activa Gemini con recipai-set-key."
+fi

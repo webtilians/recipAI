@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Bring RecipAI up to date from GitHub (branch in /etc/recipai/branch) and restart it.
+# The code is fetched before setup.sh runs, so a change to the installation itself
+# (a new command or service setting) applies in this same update.
+set -euo pipefail
+app=/opt/recipai
+branch=${RECIPAI_BRANCH:-$(cat /etc/recipai/branch 2>/dev/null || echo main)}
+git -C "$app" fetch -q origin "+refs/heads/$branch:refs/remotes/origin/$branch"
+git -C "$app" checkout -q -B "$branch" "origin/$branch"
+git -C "$app" reset -q --hard "origin/$branch"
+RECIPAI_BRANCH=$branch exec bash "$app/deploy/vps/setup.sh" "$@"
