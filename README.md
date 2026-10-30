@@ -35,7 +35,22 @@ iPhone (app Expo)  ──foto + cocina + notas──▶  backend (FastAPI)  ─�
 
 ## Probarlo en tu iPhone
 
-### 1. Backend
+El backend ya está en el servidor (ver [Servidor](#servidor)). Para que la app lo use:
+
+```powershell
+.\vps.ps1 -AppEnv        # escribe mobile\.env con la dirección y el token
+cd mobile
+npm install
+npx expo start
+```
+
+Escanea el QR con la cámara del iPhone y se abre en Expo Go. Con el servidor no hace falta
+que el iPhone y el PC estén en la misma wifi para las recetas. Sí hace falta para cargar la
+app desde `expo start`, salvo que uses `npx expo start --tunnel`.
+
+### Con el backend en tu PC (para cambiar el backend)
+
+#### 1. Backend
 
 ```powershell
 cd backend
@@ -54,7 +69,7 @@ Si todavía no la tienes, pon `RECIPAI_DEMO=1`: devuelve recetas de ejemplo sin 
 `http://localhost:8300/health` debe responder `"ai_configured": true`. Si Windows pregunta por
 el firewall, permite Python en redes privadas, para que el iPhone llegue al PC.
 
-### 2. App
+#### 2. App
 
 ```powershell
 cd mobile
@@ -71,6 +86,33 @@ npx expo start
 
 Escanea el QR con la cámara del iPhone: se abre en Expo Go. El iPhone y el PC deben estar
 en la misma wifi.
+
+## Servidor
+
+El backend corre en el servidor de LAIN, junto a DH Trails y el laboratorio:
+https://recipai.178-105-103-4.sslip.io. Detalles:
+
+- Servicio `recipai`: uvicorn en 127.0.0.1:8300, máximo 250 MB de memoria.
+- Caddy le da HTTPS desde `/etc/caddy/sites.d/recipai.caddy`.
+- Configuración y secretos en `/etc/recipai/recipai.env`.
+
+Todo se maneja desde el PC con [`vps.ps1`](vps.ps1), que usa la misma llave SSH que el `vps.ps1` de LAIN:
+
+| Comando | Qué hace |
+| --- | --- |
+| `.\vps.ps1 -Status` | Estado, versión y si usa Gemini o el modo demo |
+| `.\vps.ps1 -Gemini` | Pide tu clave de Gemini (oculta) y la activa. Antes la prueba con Google. |
+| `.\vps.ps1 -GeminiFromLain` | Usa la clave de Gemini que ya tiene LAIN en el servidor, sin que salga de él |
+| `.\vps.ps1 -Demo` | Vuelve a las recetas de ejemplo y borra la clave |
+| `.\vps.ps1 -Update` | Trae la última versión de la rama del servidor y reinicia |
+| `.\vps.ps1 -Update -Branch main` | Cambia el servidor a otra rama, por ejemplo tras fusionar un PR |
+| `.\vps.ps1 -AppEnv` | Escribe `mobile\.env` con la dirección y el token de la app |
+
+El kit de instalación está en [`deploy/vps/`](deploy/vps). En el servidor existen además
+`recipai-update`, `recipai-status`, `recipai-set-key` y `recipai-token [nuevo]`.
+
+La API exige el token de la app (`X-RecipAI-Token`), y cada IP puede pedir como mucho
+30 recetas por hora. El token va dentro de la app, así que solo frena el uso casual.
 
 ## Comprobaciones
 
@@ -98,12 +140,12 @@ real del móvil.
 
 ## Camino a la App Store
 
-1. Desplegar el backend con HTTPS. Por ejemplo, en el VPS, junto a DH Trails: subdominio propio y puerto 8300.
+1. Backend con HTTPS: hecho (ver [Servidor](#servidor)).
 2. Darse de alta en el Apple Developer Program (99 $/año).
 3. Compilar en la nube, sin Mac:
    - `npx eas-cli@latest build -p ios --profile production`
    - luego `npx eas-cli@latest submit -p ios` para subirla a TestFlight.
-4. Definir `EXPO_PUBLIC_API_URL` para EAS (`eas env:create` o `env` en `eas.json`), porque `.env` no se sube.
+4. Definir `EXPO_PUBLIC_API_URL` y `EXPO_PUBLIC_RECIPAI_TOKEN` para EAS (`eas env:create`), porque `.env` no se sube.
 5. Antes de publicar:
    - icono y pantalla de inicio propios (ahora son los de Expo);
    - política de privacidad;
