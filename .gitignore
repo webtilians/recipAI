@@ -1,0 +1,15 @@
+# Secrets and local settings
+.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Editors and tools
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
+.claude/launch.json
