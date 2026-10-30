@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 RecipAI's backend on the LAIN server, managed from this PC (same SSH key as LAIN's vps.ps1).
 
