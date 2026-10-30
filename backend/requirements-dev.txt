@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=9,<10
+# Starlette's TestClient uses httpx2 when it is installed.
+httpx2>=2.16,<3
