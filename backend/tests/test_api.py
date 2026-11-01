@@ -131,6 +131,21 @@ def test_cors_is_off_unless_origins_are_configured():
     assert open_.headers["access-control-allow-origin"] == "http://localhost:8081"
 
 
+@pytest.mark.parametrize("path, text", [("/privacidad", "Gemini"), ("/soporte", "Preguntas frecuentes"), ("/", "Soporte")])
+def test_public_pages_show_the_contact(path, text):
+    response = make_client(FakeGenerator(), contact_email="hola@example.com").get(path)
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert text in response.text
+    assert "mailto:hola@example.com" in response.text
+
+
+def test_pages_fall_back_to_github_without_an_email():
+    page = make_client(FakeGenerator()).get("/privacidad").text
+    assert "mailto:" not in page
+    assert "github.com/webtilians/recipAI/issues" in page
+
+
 def test_rate_limiter_forgets_after_an_hour():
     now = [0.0]
     limiter = RateLimiter(per_hour=1, clock=lambda: now[0])

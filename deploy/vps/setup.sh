@@ -49,7 +49,7 @@ main() {
 # RecipAI, written once by setup.sh. After editing: systemctl restart recipai
 # The Gemini key is set with recipai-set-key (from the PC: .\vps.ps1 -Gemini).
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-flash-latest
+GEMINI_MODEL=gemini-flash-lite-latest
 # Canned recipes until a Gemini key is set.
 RECIPAI_DEMO=1
 # The app sends this in X-RecipAI-Token (from the PC: .\vps.ps1 -AppEnv writes mobile/.env).

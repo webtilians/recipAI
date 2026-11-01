@@ -2,6 +2,8 @@ import type { PreparedPhoto, RecipeResults } from '@/lib/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, '');
 const APP_TOKEN = process.env.EXPO_PUBLIC_RECIPAI_TOKEN;
+/** Served by the backend; the same URL goes in App Store Connect. */
+export const PRIVACY_URL = API_URL ? `${API_URL}/privacidad` : null;
 /** A little longer than the server's own Gemini timeout. */
 const TIMEOUT_MS = 100_000;
 

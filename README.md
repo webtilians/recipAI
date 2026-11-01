@@ -128,7 +128,7 @@ GitHub Actions ejecuta lo mismo en cada PR y además empaqueta la app de iOS.
 | Variable | Para qué |
 | --- | --- |
 | `GEMINI_API_KEY` | Clave de Gemini. No se sube nunca al repo. |
-| `GEMINI_MODEL` | Modelo; por defecto `gemini-flash-latest`. |
+| `GEMINI_MODEL` | Modelo; por defecto `gemini-flash-lite-latest` (unos 4 s por foto; `gemini-flash-latest` tardaba más de 80 s). |
 | `RECIPAI_DEMO` | `1` = recetas de ejemplo, sin Gemini. |
 | `RECIPAI_APP_TOKEN` | Si se define, la app debe enviar el mismo valor (`EXPO_PUBLIC_RECIPAI_TOKEN`). Frena el uso casual de tu API, aunque quien abra la app podría extraerlo. |
 | `RECIPAI_RATE_LIMIT_PER_HOUR` | Peticiones por IP y hora; por defecto 30. |

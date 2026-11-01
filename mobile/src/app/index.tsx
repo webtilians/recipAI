@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -9,6 +9,7 @@ import { CuisinePicker } from '@/components/cuisine-picker';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { ensurePhotoConsent, openPrivacyPolicy } from '@/lib/consent';
 import { pickPhoto, type PhotoSource } from '@/lib/photo';
 import { useRecipeSession } from '@/state/recipe-session';
 
@@ -35,7 +36,8 @@ export default function CaptureScreen() {
     }
   };
 
-  const findRecipes = () => {
+  const findRecipes = async () => {
+    if (!(await ensurePhotoConsent())) return;
     search();
     router.push('/results');
   };
@@ -125,6 +127,12 @@ export default function CaptureScreen() {
         </View>
 
         <Button label="Buscar recetas" disabled={!photo || preparing !== null} onPress={findRecipes} />
+
+        <Pressable accessibilityRole="link" onPress={openPrivacyPolicy} style={styles.footer}>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+            Las fotos se analizan con Gemini (Google). Política de privacidad
+          </ThemedText>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -182,6 +190,9 @@ const styles = StyleSheet.create({
   },
   stretch: {
     alignSelf: 'stretch',
+  },
+  footer: {
+    paddingVertical: Spacing.two,
   },
   input: {
     minHeight: 72,

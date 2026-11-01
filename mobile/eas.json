@@ -5,13 +5,23 @@
   },
   "build": {
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "preview"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://recipai.178-105-103-4.sslip.io"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appName": "RecipAI: recetas de tu nevera",
+        "language": "es-ES"
+      }
+    }
   }
 }

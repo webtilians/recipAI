@@ -95,6 +95,11 @@ export default function RecipeScreen() {
           <ThemedText>{recipe.tip}</ThemedText>
         </View>
       )}
+
+      <ThemedText type="small" themeColor="textSecondary">
+        Receta generada por IA: puede tener errores. Revisa ingredientes, alergias y que la carne, el pescado y los
+        huevos queden bien cocinados.
+      </ThemedText>
     </ScrollView>
   );
 }

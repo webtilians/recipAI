@@ -10,10 +10,12 @@ import logging
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from .config import Settings, load_settings
 from .demo import DemoRecipes
 from .gemini import GeminiRecipes, GenerationError, RecipeGenerator
+from .pages import privacy_page, support_page
 from .ratelimit import RateLimiter
 from .schemas import RecipeRequest, RecipeResponse
 
@@ -36,6 +38,15 @@ def create_app(settings: Settings | None = None, generator: RecipeGenerator | No
             allow_methods=["GET", "POST"],
             allow_headers=["Content-Type", "X-RecipAI-Token"],
         )
+
+    @app.get("/privacidad", response_class=HTMLResponse)
+    def privacy() -> str:
+        return privacy_page(settings.contact_email)
+
+    @app.get("/", response_class=HTMLResponse)
+    @app.get("/soporte", response_class=HTMLResponse)
+    def support() -> str:
+        return support_page(settings.contact_email)
 
     @app.get("/health")
     def health() -> dict:
