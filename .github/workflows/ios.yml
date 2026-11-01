@@ -28,8 +28,8 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -50,11 +50,20 @@ jobs:
           echo "WORKSPACE=$WORKSPACE" >> "$GITHUB_ENV"
           echo "SCHEME=$(basename "$WORKSPACE" .xcworkspace)" >> "$GITHUB_ENV"
 
+      # Job logs need a GitHub sign-in, so the lines that say why it failed come out as annotations.
       - name: Compilar (sin firmar)
         if: github.event_name == 'push' || !inputs.testflight
-        run: >
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release
-          -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build -quiet
+        run: |
+          LOG="$RUNNER_TEMP/build.log"
+          if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
+              -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build > "$LOG" 2>&1; then
+            reasons=$(grep -E "error:|Error:|ERROR|failed with|Command PhaseScriptExecution failed" "$LOG" | sed 's/^ *//' | awk '!seen[$0]++' | head -9)
+            [ -n "$reasons" ] || reasons=$(grep -v '^\s*$' "$LOG" | tail -9)
+            printf '%s\n' "$reasons" | while IFS= read -r line; do echo "::error::${line:0:900}"; done
+            tail -60 "$LOG"
+            exit 1
+          fi
+          tail -3 "$LOG"
 
       # Signed while it is built, with the team's distribution certificate and an App Store profile made
       # through the App Store Connect API the first time and reused after (Codemagic's command line tools).
