@@ -1,0 +1,94 @@
+# The iPhone app, built on one of GitHub's Macs with Xcode 26 like DH Trails: no Expo account or EAS.
+# `expo prebuild` writes the Xcode project from app.json. Every change to mobile/ is compiled, unsigned,
+# to check it. By hand (Actions → iPhone → Run workflow, on main) it is signed and sent to TestFlight
+# with the repository's secrets:
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8  the App Store Connect API key (the .p8 file's text), as in DH Trails
+#   APPLE_TEAM_ID                          the Apple developer team
+#   CERTIFICATE_PRIVATE_KEY                the distribution certificate's private key, the same one DH Trails uses
+#   RECIPAI_APP_TOKEN                      the token the server expects (on the PC: .\vps.ps1 -CopyToken)
+name: iPhone
+on:
+  push:
+    paths: ["mobile/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: "Firmar y subir a TestFlight"
+        type: boolean
+        default: true
+
+env:
+  BUNDLE_ID: com.webtilians.recipai
+  EXPO_PUBLIC_API_URL: https://recipai.178-105-103-4.sslip.io
+
+jobs:
+  ios:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Xcode 26
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$XCODE" ] || { echo "::error::No hay Xcode 26 en este Mac de GitHub"; ls -d /Applications/Xcode*.app; exit 1; }
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+      - run: npm ci
+
+      - name: Proyecto de Xcode (expo prebuild)
+        run: |
+          npx expo prebuild --platform ios --clean
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+          [ -n "$WORKSPACE" ] || { echo "::error::expo prebuild no ha creado ningún .xcworkspace"; ls ios; exit 1; }
+          echo "WORKSPACE=$WORKSPACE" >> "$GITHUB_ENV"
+          echo "SCHEME=$(basename "$WORKSPACE" .xcworkspace)" >> "$GITHUB_ENV"
+
+      - name: Compilar (sin firmar)
+        if: github.event_name == 'push' || !inputs.testflight
+        run: >
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release
+          -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build -quiet
+
+      # Signed while it is built, with the team's distribution certificate and an App Store profile made
+      # through the App Store Connect API the first time and reused after (Codemagic's command line tools).
+      # On a failure, the lines that say why come out as the run's annotations, readable without signing in.
+      - name: Firmar y subir a TestFlight
+        if: github.event_name == 'workflow_dispatch' && inputs.testflight
+        env:
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+          CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EXPO_PUBLIC_RECIPAI_TOKEN: ${{ secrets.RECIPAI_APP_TOKEN }}
+          BUILD: ${{ github.run_number }}
+        run: |
+          fail() {
+            grep -iE "error|failed|no profiles|no signing|denied|not found|unable|invalid|exception" "$1" | head -25 |
+              while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          }
+          for name in APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY CERTIFICATE_PRIVATE_KEY APPLE_TEAM_ID EXPO_PUBLIC_RECIPAI_TOKEN; do
+            [ -n "${!name}" ] || { echo "::error::Falta un secreto ($name)"; exit 1; }
+          done
+          LOG="$RUNNER_TEMP/firma.log"
+          pipx install codemagic-cli-tools > "$LOG" 2>&1 || fail "$LOG"
+          # Each run gets a higher build number, as App Store Connect requires.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "ios/$SCHEME/Info.plist"
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $BUILD;/" "ios/$SCHEME.xcodeproj/project.pbxproj"
+          {
+            keychain initialize &&
+            app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create &&
+            keychain add-certificates &&
+            xcode-project use-profiles --project "ios/$SCHEME.xcodeproj" &&
+            xcode-project build-ipa --workspace "$WORKSPACE" --scheme "$SCHEME" --config Release &&
+            app-store-connect publish --path "build/ios/ipa/$SCHEME.ipa"
+          } >> "$LOG" 2>&1 || fail "$LOG"
+          tail -5 "$LOG"

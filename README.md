@@ -107,6 +107,7 @@ Todo se maneja desde el PC con [`vps.ps1`](vps.ps1), que usa la misma llave SSH 
 | `.\vps.ps1 -Update` | Trae la última versión de la rama del servidor y reinicia |
 | `.\vps.ps1 -Update -Branch main` | Cambia el servidor a otra rama, por ejemplo tras fusionar un PR |
 | `.\vps.ps1 -AppEnv` | Escribe `mobile\.env` con la dirección y el token de la app |
+| `.\vps.ps1 -CopyToken` | Copia el token de la app al portapapeles, para el secreto de GitHub |
 
 El kit de instalación está en [`deploy/vps/`](deploy/vps). En el servidor existen además
 `recipai-update`, `recipai-status`, `recipai-set-key` y `recipai-token [nuevo]`.
@@ -138,24 +139,45 @@ GitHub Actions ejecuta lo mismo en cada PR y además empaqueta la app de iOS.
 Detrás de un proxy (Caddy), arranca uvicorn con `--proxy-headers`. Así el límite por IP ve la IP
 real del móvil.
 
-## Camino a la App Store
+## Subir a TestFlight y a la App Store
 
-1. Backend con HTTPS: hecho (ver [Servidor](#servidor)).
-2. Darse de alta en el Apple Developer Program (99 $/año).
-3. Compilar en la nube, sin Mac:
-   - `npx eas-cli@latest build -p ios --profile production`
-   - luego `npx eas-cli@latest submit -p ios` para subirla a TestFlight.
-4. Definir `EXPO_PUBLIC_API_URL` y `EXPO_PUBLIC_RECIPAI_TOKEN` para EAS (`eas env:create`), porque `.env` no se sube.
-5. Antes de publicar:
-   - icono y pantalla de inicio propios (ahora son los de Expo);
-   - política de privacidad;
-   - la declaración de privacidad de Apple: la foto se envía a Google Gemini.
+Igual que DH Trails: el workflow [`iPhone`](.github/workflows/ios.yml) compila la app en un Mac
+de GitHub con Xcode 26, sin Mac propio y sin cuenta de Expo. `expo prebuild` genera el proyecto
+de Xcode a partir de `app.json`. Cada cambio en `mobile/` se compila sin firmar, como comprobación.
 
-   Con la API gratuita de Gemini, Google puede usar los datos para mejorar sus productos.
-   Con facturación activada, no.
+Una sola vez:
 
-Android usa el mismo código: `npx expo start` con Expo Go para Android y, para publicar,
-`eas build -p android`.
+1. En [developer.apple.com › Identifiers](https://developer.apple.com/account/resources/identifiers/list),
+   registra el App ID `com.webtilians.recipai` (tipo App, descripción «RecipAI»).
+2. En [App Store Connect › Apps](https://appstoreconnect.apple.com/apps), crea la app nueva:
+   - iOS, nombre «RecipAI: recetas de tu nevera» (si está cogido, otro);
+   - idioma principal Español (España);
+   - bundle ID `com.webtilians.recipai`, SKU `recipai`.
+3. En GitHub › Settings › Secrets and variables › Actions, añade estos secretos (los cinco primeros, los mismos que en DH Trails):
+
+   | Secreto | De dónde sale |
+   | --- | --- |
+   | `ASC_KEY_ID`, `ASC_ISSUER_ID` | App Store Connect › Usuarios y acceso › Integraciones |
+   | `ASC_KEY_P8` | El texto del archivo `AuthKey_….p8` de esa clave |
+   | `APPLE_TEAM_ID` | developer.apple.com › Membership |
+   | `CERTIFICATE_PRIVATE_KEY` | El contenido de `DHTrails-claves\ios-certificado-clave.pem` |
+   | `RECIPAI_APP_TOKEN` | `.\vps.ps1 -CopyToken` lo deja en el portapapeles |
+
+Cada versión: en GitHub › Actions › iPhone › Run workflow (rama `main`). En unos 20 minutos
+aparece en TestFlight.
+
+Antes de mandarla a revisión de la App Store:
+
+- Capturas del iPhone.
+- URL de privacidad: https://recipai.178-105-103-4.sslip.io/privacidad
+- URL de soporte: https://recipai.178-105-103-4.sslip.io/soporte
+- La declaración de privacidad de Apple: la foto se envía a Google Gemini.
+
+Con la API gratuita de Gemini, Google puede usar los datos para mejorar sus productos.
+Con facturación activada, no.
+
+Android usa el mismo código: `npx expo start` con Expo Go para Android. Para publicar,
+`npx expo prebuild --platform android` genera el proyecto de Gradle, como en DH Trails.
 
 ## Ideas para después
 

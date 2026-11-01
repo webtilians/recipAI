@@ -11,6 +11,7 @@ RecipAI's backend on the LAIN server, managed from this PC (same SSH key as LAIN
 .\vps.ps1 -GeminiFromLain             # reuse LAIN's Gemini key; it never leaves the server
 .\vps.ps1 -Demo                       # back to demo recipes
 .\vps.ps1 -AppEnv                     # write mobile\.env with the server address and app token
+.\vps.ps1 -CopyToken                  # copy the app token to the clipboard (GitHub secret RECIPAI_APP_TOKEN)
 #>
 param(
     [switch]$Install,
@@ -20,6 +21,7 @@ param(
     [switch]$GeminiFromLain,
     [switch]$Demo,
     [switch]$AppEnv,
+    [switch]$CopyToken,
     [string]$Branch,
     [string]$Ip
 )
@@ -110,8 +112,17 @@ if ($AppEnv) {
     Write-Host "mobile\.env apunta a https://$serverHost (token incluido). Reinicia 'npx expo start' para que la app lo use."
 }
 
+if ($CopyToken) {
+    $options = Get-SshOptions
+    $token = (& ssh.exe @options "root@$serverIp" 'recipai-token').Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'No se pudo leer el token del servidor.' }
+    Set-Clipboard -Value $token
+    $token = $null
+    Write-Host 'Token copiado al portapapeles. Pégalo en GitHub como secreto RECIPAI_APP_TOKEN.'
+}
+
 if ($Status) { Invoke-Server 'recipai-status' }
 
-if (-not ($Install -or $Update -or $Status -or $Gemini -or $GeminiFromLain -or $Demo -or $AppEnv)) {
+if (-not ($Install -or $Update -or $Status -or $Gemini -or $GeminiFromLain -or $Demo -or $AppEnv -or $CopyToken)) {
     Get-Help $PSCommandPath -Examples
 }
