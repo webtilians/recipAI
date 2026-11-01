@@ -1,4 +1,5 @@
-# The iPhone app, built on one of GitHub's Macs with Xcode 26 like DH Trails: no Expo account or EAS.
+# The iPhone app, built on one of GitHub's Macs with Xcode 26 like DH Trails: no Expo account or EAS. Expo SDK 58
+# needs a newer Swift than macos-15's Xcode 26.3 (expo-modules-jsi fails there), so it runs on macos-26.
 # `expo prebuild` writes the Xcode project from app.json. Every change to mobile/ is compiled, unsigned,
 # to check it. By hand (Actions → iPhone → Run workflow, on main) it is signed and sent to TestFlight
 # with the repository's secrets:
@@ -23,7 +24,7 @@ env:
 
 jobs:
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     defaults:
       run:
         working-directory: mobile
